@@ -53,6 +53,45 @@ body {
   margin-bottom: 22px;
 }
 
+.settings-card {
+  margin-bottom: 22px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.settings-row label {
+  color: var(--text);
+  font-weight: 800;
+}
+
+input[type="number"] {
+  width: 110px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 13px 14px;
+  font-size: 1rem;
+  font-weight: 800;
+  outline: none;
+}
+
+input[type="number"]:focus {
+  border-color: rgba(56, 189, 248, 0.8);
+}
+
+.small-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-bottom: 0;
+}
+
 .eyebrow {
   color: var(--accent);
   text-transform: uppercase;
@@ -321,5 +360,14 @@ button:disabled {
 
   .actions {
     flex-direction: column;
+  }
+
+  .settings-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  input[type="number"] {
+    width: 100%;
   }
 }

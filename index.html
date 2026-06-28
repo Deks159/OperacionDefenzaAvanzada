@@ -14,7 +14,7 @@
         <h1>Adivinador de secuencia de colores</h1>
         <p class="description">
           Guarda los colores correctos, elimina los colores fallidos del intento actual
-          y te muestra la secuencia que debes repetir hasta completar 10 aciertos.
+          y te muestra la secuencia que debes repetir hasta completar la cantidad elegida.
         </p>
       </div>
 
@@ -24,6 +24,23 @@
           <div id="progressFill"></div>
         </div>
       </div>
+    </section>
+
+    <section class="card settings-card">
+      <h2>Configuración de la misión</h2>
+      <p class="muted">
+        Cambia la cantidad de colores/aciertos que pide la misión. Puedes usar de 1 a 15.
+      </p>
+
+      <div class="settings-row">
+        <label for="totalStepsInput">Cantidad de colores en la secuencia:</label>
+        <input id="totalStepsInput" type="number" min="1" max="15" value="10" />
+        <button id="applyTotalSteps" class="primary">Aplicar</button>
+      </div>
+
+      <p id="settingsNote" class="small-note">
+        Actualmente la misión está configurada en 10 colores.
+      </p>
     </section>
 
     <section class="grid">
@@ -80,11 +97,12 @@
     <section class="card instructions">
       <h2>Cómo usarlo</h2>
       <ol>
+        <li>Configura cuántos colores/aciertos tendrá la misión, máximo 15.</li>
         <li>Presiona un color y pruébalo en el juego.</li>
         <li>Si el juego lo acepta, presiona <strong>Marcar correcto</strong>.</li>
         <li>Si falla, presiona <strong>Marcar incorrecto</strong>; ese color se bloqueará para ese mismo paso.</li>
         <li>Repite la secuencia guardada en el juego y prueba otro color restante.</li>
-        <li>Continúa hasta completar los 10 colores correctos.</li>
+        <li>Continúa hasta completar la cantidad configurada.</li>
       </ol>
     </section>
   </main>

@@ -5,12 +5,15 @@ const COLORS = [
   { id: "amarillo", name: "Amarillo" },
 ];
 
-const TOTAL_STEPS = 10;
-const STORAGE_KEY = "adivinador-colores-v1";
+const MIN_STEPS = 1;
+const MAX_STEPS = 15;
+const DEFAULT_STEPS = 10;
+const STORAGE_KEY = "adivinador-colores-v2";
 
 let state = {
+  totalSteps: DEFAULT_STEPS,
   sequence: [],
-  failedByStep: Array.from({ length: TOTAL_STEPS }, () => []),
+  failedByStep: Array.from({ length: DEFAULT_STEPS }, () => []),
   selectedColor: null,
   message: "Paso 1: elige un color para probar.",
   messageType: "neutral",
@@ -30,6 +33,9 @@ const els = {
   copySequence: document.getElementById("copySequence"),
   undoLast: document.getElementById("undoLast"),
   resetGame: document.getElementById("resetGame"),
+  totalStepsInput: document.getElementById("totalStepsInput"),
+  applyTotalSteps: document.getElementById("applyTotalSteps"),
+  settingsNote: document.getElementById("settingsNote"),
 };
 
 function loadState() {
@@ -38,23 +44,39 @@ function loadState() {
 
   try {
     const parsed = JSON.parse(saved);
+    const totalSteps = clampSteps(parsed.totalSteps || DEFAULT_STEPS);
+
     state = {
       ...state,
       ...parsed,
-      failedByStep: normalizeFailedSteps(parsed.failedByStep),
+      totalSteps,
+      sequence: Array.isArray(parsed.sequence)
+        ? parsed.sequence.slice(0, totalSteps)
+        : [],
+      failedByStep: normalizeFailedSteps(parsed.failedByStep, totalSteps),
       selectedColor: null,
     };
+
+    updateCompletedMessageIfNeeded();
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
 }
 
-function normalizeFailedSteps(value) {
+function clampSteps(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) return DEFAULT_STEPS;
+
+  return Math.min(MAX_STEPS, Math.max(MIN_STEPS, Math.trunc(number)));
+}
+
+function normalizeFailedSteps(value, totalSteps = state.totalSteps) {
   if (!Array.isArray(value)) {
-    return Array.from({ length: TOTAL_STEPS }, () => []);
+    return Array.from({ length: totalSteps }, () => []);
   }
 
-  return Array.from({ length: TOTAL_STEPS }, (_, index) => {
+  return Array.from({ length: totalSteps }, (_, index) => {
     const step = value[index];
     return Array.isArray(step) ? step : [];
   });
@@ -64,6 +86,7 @@ function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
+      totalSteps: state.totalSteps,
       sequence: state.sequence,
       failedByStep: state.failedByStep,
       message: state.message,
@@ -90,7 +113,7 @@ function colorName(id) {
 }
 
 function selectColor(id) {
-  if (currentStepIndex() >= TOTAL_STEPS) return;
+  if (currentStepIndex() >= state.totalSteps) return;
   if (currentFailedColors().includes(id)) return;
 
   state.selectedColor = id;
@@ -100,15 +123,14 @@ function selectColor(id) {
 }
 
 function markCorrect() {
-  if (!state.selectedColor || currentStepIndex() >= TOTAL_STEPS) return;
+  if (!state.selectedColor || currentStepIndex() >= state.totalSteps) return;
 
   state.sequence.push(state.selectedColor);
   state.selectedColor = null;
 
-  if (state.sequence.length >= TOTAL_STEPS) {
-    state.message = "Secuencia completa: ya tienes los 10 colores correctos.";
-    state.messageType = "done";
-  } else {
+  updateCompletedMessageIfNeeded();
+
+  if (state.sequence.length < state.totalSteps) {
     state.message = `Correcto. Ahora vas en el paso ${state.sequence.length + 1}.`;
     state.messageType = "good";
   }
@@ -117,8 +139,15 @@ function markCorrect() {
   render();
 }
 
+function updateCompletedMessageIfNeeded() {
+  if (state.sequence.length >= state.totalSteps) {
+    state.message = `Secuencia completa: ya tienes los ${state.totalSteps} colores correctos.`;
+    state.messageType = "done";
+  }
+}
+
 function markWrong() {
-  if (!state.selectedColor || currentStepIndex() >= TOTAL_STEPS) return;
+  if (!state.selectedColor || currentStepIndex() >= state.totalSteps) return;
 
   const step = currentStepIndex();
   const failed = state.failedByStep[step];
@@ -165,13 +194,11 @@ function resetGame() {
   const confirmed = confirm("¿Seguro que quieres borrar toda la secuencia y los colores descartados?");
   if (!confirmed) return;
 
-  state = {
-    sequence: [],
-    failedByStep: Array.from({ length: TOTAL_STEPS }, () => []),
-    selectedColor: null,
-    message: "Paso 1: elige un color para probar.",
-    messageType: "neutral",
-  };
+  state.sequence = [];
+  state.failedByStep = Array.from({ length: state.totalSteps }, () => []);
+  state.selectedColor = null;
+  state.message = "Paso 1: elige un color para probar.";
+  state.messageType = "neutral";
 
   saveState();
   render();
@@ -199,9 +226,50 @@ async function copySequence() {
   render();
 }
 
+function applyTotalSteps() {
+  const newTotal = clampSteps(els.totalStepsInput.value);
+  const oldTotal = state.totalSteps;
+
+  els.totalStepsInput.value = newTotal;
+
+  if (newTotal === oldTotal) {
+    state.message = `La misión ya estaba configurada en ${newTotal} colores.`;
+    state.messageType = "neutral";
+    render();
+    return;
+  }
+
+  if (state.sequence.length > newTotal) {
+    const confirmed = confirm(
+      `Ya tienes ${state.sequence.length} colores guardados. Si cambias a ${newTotal}, se recortará la secuencia. ¿Continuar?`
+    );
+
+    if (!confirmed) {
+      els.totalStepsInput.value = oldTotal;
+      return;
+    }
+
+    state.sequence = state.sequence.slice(0, newTotal);
+  }
+
+  state.totalSteps = newTotal;
+  state.failedByStep = normalizeFailedSteps(state.failedByStep, newTotal);
+  state.selectedColor = null;
+
+  if (state.sequence.length >= state.totalSteps) {
+    updateCompletedMessageIfNeeded();
+  } else {
+    state.message = `Cantidad actualizada. Ahora la misión pide ${newTotal} colores.`;
+    state.messageType = "good";
+  }
+
+  saveState();
+  render();
+}
+
 function renderColorButtons() {
   const failed = currentFailedColors();
-  const completed = currentStepIndex() >= TOTAL_STEPS;
+  const completed = currentStepIndex() >= state.totalSteps;
 
   els.colorButtons.innerHTML = "";
 
@@ -247,7 +315,7 @@ function renderWrongList() {
 
   const failed = currentFailedColors();
 
-  if (currentStepIndex() >= TOTAL_STEPS) {
+  if (currentStepIndex() >= state.totalSteps) {
     els.wrongList.classList.add("empty");
     els.wrongList.textContent = "Misión completada.";
     return;
@@ -280,7 +348,7 @@ function createChip(id, label) {
 }
 
 function renderSuggestion() {
-  if (currentStepIndex() >= TOTAL_STEPS) {
+  if (currentStepIndex() >= state.totalSteps) {
     els.suggestionText.textContent = "Misión completada";
     return;
   }
@@ -292,11 +360,16 @@ function renderSuggestion() {
       : "Sin colores restantes";
 }
 
+function renderSettings() {
+  els.totalStepsInput.value = state.totalSteps;
+  els.settingsNote.textContent = `Actualmente la misión está configurada en ${state.totalSteps} colores.`;
+}
+
 function render() {
   const step = currentStepIndex();
-  const percent = (step / TOTAL_STEPS) * 100;
+  const percent = (step / state.totalSteps) * 100;
 
-  els.progressText.textContent = `${step} / ${TOTAL_STEPS}`;
+  els.progressText.textContent = `${step} / ${state.totalSteps}`;
   els.progressFill.style.width = `${percent}%`;
 
   els.statusBox.className = `status ${state.messageType}`;
@@ -307,13 +380,14 @@ function render() {
     : "Color seleccionado: ninguno";
 
   const hasSelected = Boolean(state.selectedColor);
-  const completed = step >= TOTAL_STEPS;
+  const completed = step >= state.totalSteps;
 
   els.markCorrect.disabled = !hasSelected || completed;
   els.markWrong.disabled = !hasSelected || completed;
   els.undoLast.disabled = state.sequence.length === 0;
   els.copySequence.disabled = state.sequence.length === 0;
 
+  renderSettings();
   renderColorButtons();
   renderSequence();
   renderWrongList();
@@ -325,6 +399,13 @@ els.markWrong.addEventListener("click", markWrong);
 els.undoLast.addEventListener("click", undoLast);
 els.resetGame.addEventListener("click", resetGame);
 els.copySequence.addEventListener("click", copySequence);
+els.applyTotalSteps.addEventListener("click", applyTotalSteps);
+
+els.totalStepsInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    applyTotalSteps();
+  }
+});
 
 loadState();
 render();
